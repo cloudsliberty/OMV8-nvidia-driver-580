@@ -83,3 +83,25 @@ several older/compute functions needed for this GPU).
   driver was installed outside apt, apt has no record of it and won't
   interfere, but keep an eye out in case a future kernel package pulls in
   nouveau again.
+
+
+Here's how to get GPU access working inside Docker containers on your OMV box.
+1. Install the NVIDIA Container Toolkit
+Code
+2. Configure Docker to use the NVIDIA runtime
+Code
+This adds an nvidia runtime entry to /etc/docker/daemon.json.
+3. Verify Docker can see the GPU
+Code
+If this prints your GTX 1060, Docker-level GPU passthrough is working.
+4. Add GPU access to Emby
+If you're managing it via docker run or a compose file, add:
+Yaml
+Then inside Emby's web UI: Settings → Transcoding → set Hardware acceleration to NVIDIA NVENC, and enable it for the codecs you need (H.264/HEVC decode+encode).
+If you're using OMV-Extras' Docker/Compose GUI or Portainer instead of raw compose files, the equivalent is: add --runtime=nvidia (or select "nvidia" under GPU/runtime options if the GUI exposes it) plus those two environment variables.
+5. Add GPU access to Nextcloud Memories
+Memories uses go-vod for video transcoding, which also needs NVENC. In your Nextcloud (or dedicated go-vod) container:
+Yaml
+Then in Nextcloud: Memories app settings → Transcoding → enable hardware acceleration and select NVIDIA/NVENC. If you're running go-vod as a separate sidecar container (common in the Memories docs), apply the same runtime: nvidia + env vars to that container instead of/alongside Nextcloud itself.
+A note on concurrent transcodes: consumer GPUs like the 1060 are limited by Nvidia's driver to a small number of simultaneous NVENC sessions (historically capped at 2–3 unless patched). If you'll run Emby and Nextcloud Memories transcoding at the same time, you may hit that limit — there's an unofficial patch for the session cap if it becomes an issue, happy to cover that if you run into it.
+Want me to help you find/edit your actual docker-compose.yml files for these two, if you're running them via compose?
