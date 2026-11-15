@@ -111,3 +111,65 @@ Yaml
 Then in Nextcloud: Memories app settings → Transcoding → enable hardware acceleration and select NVIDIA/NVENC. If you're running go-vod as a separate sidecar container (common in the Memories docs), apply the same runtime: nvidia + env vars to that container instead of/alongside Nextcloud itself.
 A note on concurrent transcodes: consumer GPUs like the 1060 are limited by Nvidia's driver to a small number of simultaneous NVENC sessions (historically capped at 2–3 unless patched). If you'll run Emby and Nextcloud Memories transcoding at the same time, you may hit that limit — there's an unofficial patch for the session cap if it becomes an issue, happy to cover that if you run into it.
 Want me to help you find/edit your actual docker-compose.yml files for these two, if you're running them via compose?
+
+
+---------------------------------------------------------------
+
+Maxwell, Pascal and Volta GPUs on Trixie (D-13)
+🔗
+
+580 LTS series of the driver required for Maxwell/Pascal/Volta support (see the details above), is not available in the D-13 repo, but several users reported, that drivers from the Debian-12 repo generally worked well with Debian-13 as well. This section covers all the work-arounds needed for such installation.
+
+Note: so far this method has been tested only on amd64 CPU arch (Intel/AMD), hence that's what the below instructions assume.
+
+
+Using drivers originally intended for a different release is at least a bit of a dirty hack and borderline "FrankenDebian".
+
+Proceed at your own risk.
+
+MAKE SURE that you've completed mandatory steps described in the prerequisites section.
+
+Since 2026-02-01, Debian-13 rejects signatures using SHA1 used in the NV D-12 repo. Additionally, D-13 migrated signature verification tool from gpgv to sqv that does not accept additional options from apt sources. To workaround it all, you need to:
+
+Revert back to using gpgv by adding the below config option somewhere in /etc/apt/apt.conf.d/ folder, for example in /etc/apt/apt.conf.d/10gpgv file:
+
+APT::Key::GPGVCommand "/usr/bin/gpgv";
+Configure apt sources with relaxed verification policy: add the below Nvidia D-12 repo somewhere in /etc/apt/sources.list.d/ folder, for example in /etc/apt/sources.list.d/nvidia-d12.list file:
+
+deb [signed-by=/etc/apt/keyrings/nvidia-d12-archive.key allow-insecure=yes] http://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/ /
+Download and extract the original Nvidia D-12 repo definition also containing the key:
+
+$ wget -O /tmp/nv-d12-repo-config.deb https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/cuda-keyring_1.1-1_all.deb
+$ dpkg -x /tmp/nv-d12-repo-config.deb /tmp/nv-d12-repo-config
+Copy the Nvidia key to the location pointed in the repo definition from the 2nd point, update apt's DB and upgrade the system as the Nvidia repo provides newer versions of some system utilities (most notably DKMS) :
+
+# cp /tmp/nv-d12-repo-config/usr/share/keyrings/cuda-archive-keyring.gpg  /etc/apt/keyrings/nvidia-d12-archive.key
+# apt update
+# apt dist-upgrade
+Install nvidia-driver-pinning-580 package to stay on v580 series of the driver and update apt DB again:
+
+# apt install nvidia-driver-pinning-580
+# apt update
+Install cuda-drivers meta-package:
+
+# apt install cuda-drivers
+DKMS will build the proprietary modules for your system.
+
+Proceed to the post-installation steps.
+
+
+If you also install CUDA toolkit to develop/build CUDA apps, depending on the toolkit version, you may need to apply a few tiny patches to one of the header files as described in this thread and this thread. Versions >= 13.2 should not require patching anymore.
+
+
+
+Post-installation steps for NV DC drivers
+🔗
+
+Optionally verify the result of the DKMS module compilation:
+
+# dkms status 'nvidia*'
+This should result in 1 or more lines (1 per each installed kernel version) similar to the below: (the exact versions may differ)
+
+nvidia/550.163.01, 6.12.57+deb13-amd64, x86_64: installed
+Anything other than installed at the end means there was some problem: see Troubleshooting section in such case.
+source: https://wiki.debian.org/NvidiaGraphicsDrivers?pow_referer=https%3A%2F%2Fforums.developer.nvidia.com%2F#data-center-d13
