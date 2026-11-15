@@ -179,65 +179,85 @@ source: https://wiki.debian.org/NvidiaGraphicsDrivers?pow_referer=https%3A%2F%2F
 
 
 
+# NVIDIA Container Toolkit Installation & Docker Configuration Guide
 
-To get GPU access working inside Docker containers on your system (such as an OpenMediaVault / OMV box), follow these clean, step-by-step procedures to install the NVIDIA Container Toolkit separately and configure the Docker daemon.
+This guide provides step-by-step procedures to install the **NVIDIA Container Toolkit** separately and configure the Docker daemon to enable GPU access within containers (e.g., on an OpenMediaVault / OMV box).
 
-1
-Set up the Repository and GPG Key
-2 min
-Add the official NVIDIA repository and its GPG key to your system's package manager securely. Run the following command in your terminal:
+---
 
-Bash
+## Important Notice regarding `apt`
+
+> **Avoid running `apt upgrade` blindly on NVIDIA-related packages.**  
+> If your base NVIDIA driver was installed outside of `apt` (e.g., using the official `.run` installer), `apt` has no record of it and will not interfere directly. However, keep an eye out during future system updates to ensure a kernel update does not pull in the `nouveau` open-source driver or overwrite your custom driver module.
+
+---
+
+## Step-by-Step Installation Procedures
+
+### Step 1: Set up the Repository GPG Key
+Add the official NVIDIA repository GPG key to your system's package manager keyrings directory:
+
+```bash
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-Verification: Check that the keyring file was successfully created at /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg.
+```
 
-2
-Add the Package Repository Source
-1 min
-Configure the repository list with proper signature verification by running:
+* **Verification:** Ensure the file exists by running `ls -l /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg`.
 
-Bash
+---
+
+### Step 2: Add the Package Repository Source
+Configure the repository list to explicitly use the downloaded GPG keyring for signature verification:
+
+```bash
 curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
   sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
   sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-Verification: Ensure /etc/apt/sources.list.d/nvidia-container-toolkit.list exists and contains the correct repository URL with the signed-by keyring reference.
+```
 
-3
-Update Package Lists and Install Toolkit
-3 min
-Refresh your local package index and install the toolkit package.
+* **Verification:** Run `cat /etc/apt/sources.list.d/nvidia-container-toolkit.list` to verify the source entry and `signed-by` attribute.
 
-Note: As mentioned, avoid running a blind apt upgrade on NVIDIA-related packages if your base driver was installed outside of apt, to prevent version conflicts.
+---
 
-Run the update and install commands:
+### Step 3: Update Package Lists and Install the Toolkit
+Update your local package index and install the `nvidia-container-toolkit` package:
 
-Bash
+```bash
 sudo apt update
 sudo apt install -y nvidia-container-toolkit
-Verification: Run nvidia-ctk --version to confirm the toolkit binary is correctly installed and accessible.
+```
 
-4
-Configure the Docker Daemon
-2 min
-Configure Docker to recognize the NVIDIA runtime by running the automatic configuration command provided by the toolkit:
+* **Verification:** Confirm the utility is installed by running `nvidia-ctk --version`.
 
-Bash
+---
+
+### Step 4: Configure the Docker Daemon
+Use the toolkit utility to automatically update `/etc/docker/daemon.json` to register the NVIDIA runtime:
+
+```bash
 sudo nvidia-ctk runtime configure --runtime=docker
-This updates your /etc/docker/daemon.json file to include the nvidia runtime entry.
-Verification: Inspect /etc/docker/daemon.json using cat /etc/docker/daemon.json and verify that "runtimes" includes the nvidia handler.
+```
 
-5
-Restart the Docker Service
-1 min
-Apply the configuration changes by restarting the Docker daemon:
+* **Verification:** Check `/etc/docker/daemon.json` using `cat /etc/docker/daemon.json` to verify the `nvidia` runtime configuration entry is present.
 
-Bash
+---
+
+### Step 5: Restart the Docker Service
+Restart the Docker daemon to apply the new runtime configuration:
+
+```bash
 sudo systemctl restart docker
-Verification: Run sudo systemctl status docker to ensure the service restarted successfully without errors.
+```
 
-Test Your Setup
-To verify that your containers can successfully access your GPU, run a test container using the official CUDA image:
+* **Verification:** Confirm the service is active by running `sudo systemctl status docker`.
 
-Bash
+---
+
+## Verification & Testing
+
+To confirm that Docker containers can access your host GPU, run a minimal CUDA test container:
+
+```bash
 sudo docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi
-If everything is configured correctly, this command will print out your GPU details and driver version table from inside the test container.
+```
+
+If the setup is successful, the output will display your GPU name, driver version, and current memory usage from within the container.
