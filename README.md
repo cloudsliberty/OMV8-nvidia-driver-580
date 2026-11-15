@@ -114,6 +114,8 @@ Want me to help you find/edit your actual docker-compose.yml files for these two
 
 
 ---------------------------------------------------------------
+> **Method 2**
+---------------------------------------------------------------
 
 Maxwell, Pascal and Volta GPUs on Trixie (D-13)
 🔗
